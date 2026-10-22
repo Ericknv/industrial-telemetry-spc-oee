@@ -1,0 +1,30 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Ambientes virtuais
+venv/
+env/
+ENV/
+.venv/
+
+# Dados binários e temporários do banco
+data/*.duckdb
+data/*.duckdb.wal
+data/*.csv
+data/*.xlsx
+
+# Relatórios gerados em downloads locais
+relatorio_*.csv
+relatorio_*.xlsx
+
+# Configurações de IDEs e editores
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Arquivos de sistema operacional
+.DS_Store
+Thumbs.db

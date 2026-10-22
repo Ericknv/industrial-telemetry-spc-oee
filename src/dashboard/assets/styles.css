@@ -1,0 +1,181 @@
+/* Paleta Industrial Slate de Alto Contraste */
+:root {
+  --bg-main: #0f172a;        /* Azul ardósia profundo */
+  --bg-card: #1e293b;        /* Fundo dos cartões */
+  --border-card: #334155;    /* Bordas discretas */
+  --text-main: #f8fafc;      /* Branco puro para leitura primária */
+  --text-dim: #cbd5e1;       /* Cinza claro nítido para subtítulos e rótulos */
+  --accent-cyan: #38bdf8;    /* Destaque analítico */
+  --accent-green: #10b981;   /* Sucesso e ganhos */
+  --accent-amber: #f59e0b;   /* Avisos */
+  --accent-red: #f43f5e;     /* Alertas e paradas */
+}
+
+body {
+  background-color: var(--bg-main) !important;
+  color: var(--text-main) !important;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  margin: 0;
+  padding: 0;
+}
+
+/* Cartões Industriais */
+.kpi-card {
+  background-color: var(--bg-card) !important;
+  border: 1px solid var(--border-card) !important;
+  border-radius: 8px !important;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.3), 0 2px 4px -2px rgba(0, 0, 0, 0.2);
+}
+
+.kpi-title {
+  color: var(--text-dim) !important;
+  font-size: 0.85rem !important;
+  font-weight: 600 !important;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.kpi-value {
+  color: var(--text-main) !important;
+  font-size: 2rem !important;
+  font-weight: 700 !important;
+  letter-spacing: -0.02em;
+}
+
+/* ========================================================
+   REMOÇÃO / ESTILIZAÇÃO DAS CAIXAS LATERAIS DO SLIDER
+   ======================================================== */
+/* Oculta os inputs/caixas numéricas brancas laterais dos sliders */
+.dash-slider-input,
+.rc-slider-input,
+input[type="number"].rc-slider-input,
+.dash-input-container {
+  display: none !important;
+  visibility: hidden !important;
+}
+
+/* Caso o elemento persista no DOM como input padrão, força fundo escuro e texto nítido */
+input[type="number"] {
+  background-color: #0f172a !important;
+  color: #38bdf8 !important;
+  border: 1px solid #475569 !important;
+  border-radius: 6px !important;
+  font-weight: bold !important;
+  text-align: center !important;
+}
+
+/* ========================================================
+   SLIDERS (rc-slider)
+   ======================================================== */
+.rc-slider {
+  margin-bottom: 25px !important;
+}
+
+.rc-slider-rail {
+  background-color: #334155 !important;
+  height: 6px !important;
+}
+
+.rc-slider-track {
+  background-color: #818cf8 !important;
+  height: 6px !important;
+}
+
+.rc-slider-handle {
+  border: 2px solid #a5b4fc !important;
+  background-color: #4f46e5 !important;
+  opacity: 1 !important;
+  width: 18px !important;
+  height: 18px !important;
+  margin-top: -6px !important;
+}
+
+.rc-slider-handle:hover,
+.rc-slider-handle:active {
+  box-shadow: 0 0 0 5px rgba(129, 140, 248, 0.3) !important;
+}
+
+.rc-slider-mark-text {
+  color: #94a3b8 !important;
+  font-size: 0.85rem !important;
+  font-weight: 500 !important;
+}
+
+.rc-slider-mark-text-active {
+  color: #f8fafc !important;
+  font-weight: 600 !important;
+}
+
+.rc-slider-tooltip {
+  display: none !important;
+}
+
+/* ========================================================
+   DROPDOWN (react-select / dcc.Dropdown)
+   ======================================================== */
+.Select,
+.Select-control,
+.Select div {
+  background-color: #1e293b !important;
+  border-color: #475569 !important;
+  color: #f8fafc !important;
+}
+
+.Select-value-label,
+.Select-value,
+.Select-placeholder,
+.Select--single > .Select-control .Select-value {
+  color: #38bdf8 !important;
+  font-weight: 600 !important;
+  font-size: 0.95rem !important;
+}
+
+.Select-arrow {
+  border-color: #94a3b8 transparent transparent !important;
+}
+
+.Select-menu-outer {
+  background-color: #1e293b !important;
+  border: 1px solid #475569 !important;
+  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.5) !important;
+  z-index: 9999 !important;
+}
+
+.Select-option {
+  background-color: #1e293b !important;
+  color: #cbd5e1 !important;
+  padding: 10px 15px !important;
+}
+
+.Select-option:hover,
+.Select-option.is-focused {
+  background-color: #334155 !important;
+  color: #38bdf8 !important;
+  font-weight: 600 !important;
+}
+
+.Select-option.is-selected {
+  background-color: #0f172a !important;
+  color: #10b981 !important;
+  font-weight: 700 !important;
+}
+
+/* ========================================================
+   NAVEGAÇÃO E ABAS
+   ======================================================== */
+.nav-tabs {
+  border-bottom: 2px solid var(--border-card) !important;
+}
+
+.nav-tabs .nav-link {
+  color: var(--text-dim) !important;
+  border: none !important;
+  font-weight: 600;
+  padding: 12px 20px;
+}
+
+.nav-tabs .nav-link.active {
+  color: var(--accent-cyan) !important;
+  background-color: transparent !important;
+  border-bottom: 3px solid var(--accent-cyan) !important;
+}
