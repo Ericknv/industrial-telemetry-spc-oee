@@ -1,7 +1,9 @@
 """
 Aplicação Principal Plotly Dash:
 Painel Integrado de Telemetria Operacional, OEE, Simulador What-If,
-Controle Estatístico de Processo (CEP) e Exportação de Relatórios Executivos (CSV/Excel).
+Controle Estatístico de Processo (CEP), Confiabilidade & Downtime (TPM)
+e Exportação de Relatórios Executivos (CSV/Excel).
+Layout Panorâmico Horizontal em Alto Contraste.
 """
 
 import io
@@ -9,6 +11,7 @@ from dash import Dash, Input, Output, ctx, dcc, html
 import dash_bootstrap_components as dbc
 import polars as pl
 
+from src.core.downtime_engine import DowntimeEngine
 from src.core.oee_engine import OEEEngine
 from src.core.spc_engine import SPCEngine
 from src.dashboard.components.charts import (
@@ -17,24 +20,28 @@ from src.dashboard.components.charts import (
     create_oee_waterfall,
     create_pareto_chart,
     create_r_chart,
+    create_sector_pareto_chart,
+    create_stop_type_donut,
     create_xbar_chart,
 )
+from src.dashboard.layouts.tab_downtime import render_tab_downtime
 from src.dashboard.layouts.tab_oee import render_tab_oee
 from src.dashboard.layouts.tab_spc import render_tab_spc
 
-# Motores de cálculo
+# Motores de cálculo analítico
 oee_engine = OEEEngine()
 spc_engine = SPCEngine()
+downtime_engine = DowntimeEngine()
 
 # Instância da aplicação Dash
 app = Dash(
     __name__,
     external_stylesheets=[dbc.themes.CYBORG],
     suppress_callback_exceptions=True,
-    title="Industrial Analytics | OEE & SPC",
+    title="Industrial Telemetry | OEE, TPM & SPC",
 )
 
-# Layout Raiz
+# Layout Raiz Horizontal Panorâmico
 app.layout = html.Div(
     [
         dbc.Container(
@@ -49,45 +56,48 @@ app.layout = html.Div(
                                     style={"color": "#f8fafc", "fontWeight": "700", "marginTop": "20px"},
                                 ),
                                 html.P(
-                                    "Monitoramento Operacional Contínuo: OEE e Controle Estatístico de Processo",
-                                    style={"color": "#94a3b8", "marginBottom": "25px", "fontSize": "1.05rem"},
+                                    "Monitoramento Operacional Contínuo: OEE, Gestão de Downtime (TPM) e Controle Estatístico de Processo",
+                                    style={"color": "#94a3b8", "marginBottom": "20px", "fontSize": "1.02rem"},
                                 ),
                             ],
                             width=12,
                         )
                     ]
                 ),
-                # Navegação em Abas
+                # Navegação em Abas (OEE, Confiabilidade/Downtime e CEP)
                 dbc.Tabs(
                     [
                         dbc.Tab(
                             label="Desempenho Operacional (OEE)",
                             tab_id="tab-oee",
-                            tab_style={"backgroundColor": "#1e293b", "border": "none"},
-                            active_tab_style={"backgroundColor": "#334155", "color": "#38bdf8", "fontWeight": "bold"},
+                        ),
+                        dbc.Tab(
+                            label="Confiabilidade & Downtime (TPM)",
+                            tab_id="tab-downtime",
                         ),
                         dbc.Tab(
                             label="Engenharia da Qualidade (CEP)",
                             tab_id="tab-spc",
-                            tab_style={"backgroundColor": "#1e293b", "border": "none"},
-                            active_tab_style={"backgroundColor": "#334155", "color": "#38bdf8", "fontWeight": "bold"},
                         ),
                     ],
                     id="main-tabs",
                     active_tab="tab-oee",
-                    className="mb-4",
+                    className="nav-tabs mb-4",
                 ),
-                # Contêiner dinâmico do conteúdo da aba ativa
+                # Conteúdo dinâmico da aba ativa
                 html.Div(id="tab-content"),
             ],
             fluid=True,
             className="px-4 py-2",
         )
     ],
-    style={"backgroundColor": "#0f172a", "minHeight": "100vh", "color": "#f8fafc"},
+    style={"backgroundColor": "#0f172a", "minHeight": "100vh"},
 )
 
 
+# ========================================================
+# ROTEAMENTO DE ABAS
+# ========================================================
 @app.callback(
     Output("tab-content", "children"),
     Input("main-tabs", "active_tab"),
@@ -95,11 +105,16 @@ app.layout = html.Div(
 def switch_tabs(active_tab):
     if active_tab == "tab-oee":
         return render_tab_oee()
+    elif active_tab == "tab-downtime":
+        return render_tab_downtime()
     elif active_tab == "tab-spc":
         return render_tab_spc()
     return html.Div("Selecione uma aba válida.")
 
 
+# ========================================================
+# CALLBACKS DA ABA DE OEE
+# ========================================================
 @app.callback(
     [
         Output("kpi-oee", "children"),
@@ -139,7 +154,6 @@ def update_oee_tab(selected_shift):
     )
 
 
-# Callback Reativo do Simulador What-If
 @app.callback(
     [
         Output("sim-oee-value", "children"),
@@ -189,7 +203,6 @@ def update_what_if_simulation(shift, setup_pct, breakdown_pct, scrap_pct):
     )
 
 
-# Callback de Exportação da Aba de OEE (CSV / Excel direto pelo Polars)
 @app.callback(
     Output("download-oee-report", "data"),
     [
@@ -225,14 +238,12 @@ def export_oee_report(n_clicks_csv, n_clicks_excel, selected_shift):
         ])
 
         excel_bytes = io.BytesIO()
-        # Exporta com abas separadas utilizando a engine nativa do Polars
         with pl.Config(tbl_rows=-1):
             df_kpis.write_excel(
                 workbook=excel_bytes,
                 worksheet="Resumo_OEE",
                 table_style="Table Style Medium 9",
             )
-            # Adiciona o pareto como segunda aba
             df_pareto.write_excel(
                 workbook=excel_bytes,
                 worksheet="Pareto_Paradas",
@@ -241,7 +252,157 @@ def export_oee_report(n_clicks_csv, n_clicks_excel, selected_shift):
         return dcc.send_bytes(excel_bytes.getvalue(), "relatorio_executivo_oee.xlsx")
 
 
-# Callback para a Aba de CEP
+# ========================================================
+# CALLBACKS DA NOVA ABA: DOWNTIME & CONFIABILIDADE (TPM)
+# ========================================================
+@app.callback(
+    [
+        Output("kpi-mtbf", "children"),
+        Output("kpi-mttr", "children"),
+        Output("kpi-tech-avail", "children"),
+        Output("kpi-failures-count", "children"),
+        Output("chart-pareto-sector", "figure"),
+        Output("chart-donut-stop-type", "figure"),
+        Output("table-downtime-events-container", "children"),
+    ],
+    Input("downtime-shift-filter", "value"),
+)
+def update_downtime_tab(selected_shift):
+    shift_arg = None if selected_shift == "ALL" else selected_shift
+
+    tpm_kpis = downtime_engine.calculate_tpm_kpis(shift_arg)
+    df_sector = downtime_engine.get_pareto_by_sector(shift_arg)
+    df_stop_types = downtime_engine.get_stop_type_breakdown(shift_arg)
+    df_events = downtime_engine.get_detailed_downtime_log(shift_arg)
+
+    kpi_mtbf = f"{tpm_kpis.mtbf_minutes:.1f} min"
+    kpi_mttr = f"{tpm_kpis.mttr_minutes:.1f} min"
+    kpi_avail = f"{tpm_kpis.technical_availability * 100:.1f}%"
+    kpi_failures = f"{tpm_kpis.failures_count} falhas"
+
+    fig_sector = create_sector_pareto_chart(df_sector)
+    fig_donut = create_stop_type_donut(df_stop_types)
+
+    # Construção da tabela executiva com as ocorrências
+    if df_events.is_empty():
+        table_component = html.P("Nenhum evento registrado no turno.", className="text-muted")
+    else:
+        # Exibe os 10 eventos mais recentes
+        recent_events = df_events.head(10).to_dicts()
+        table_rows = []
+        for ev in recent_events:
+            badge_color = "danger" if ev["stop_type"] == "NÃO_PLANEJADA" else "warning"
+            table_rows.append(
+                html.Tr(
+                    [
+                        html.Td(ev["start_time"].strftime("%H:%M:%S")),
+                        html.Td(ev["end_time"].strftime("%H:%M:%S")),
+                        html.Td(f"{ev['duration_min']:.1f} min", className="fw-bold text-info"),
+                        html.Td(
+                            dbc.Badge(
+                                ev["stop_type"],
+                                color=badge_color,
+                                className="px-2 py-1",
+                            )
+                        ),
+                        html.Td(ev["sector"], className="fw-bold"),
+                        html.Td(ev["sub_reason"]),
+                        html.Td(ev["shift"], className="text-muted"),
+                    ]
+                )
+            )
+
+        table_component = dbc.Table(
+            [
+                html.Thead(
+                    html.Tr(
+                        [
+                            html.Th("Início"),
+                            html.Th("Fim"),
+                            html.Th("Duração"),
+                            html.Th("Classificação"),
+                            html.Th("Setor Responsável"),
+                            html.Th("Motivo Operacional"),
+                            html.Th("Turno"),
+                        ],
+                        style={"color": "#94a3b8", "borderBottom": "2px solid #334155"},
+                    )
+                ),
+                html.Tbody(table_rows),
+            ],
+            responsive=True,
+            hover=True,
+            className="mb-0",
+            style={"color": "#f8fafc", "fontSize": "0.9rem"},
+        )
+
+    return (
+        kpi_mtbf,
+        kpi_mttr,
+        kpi_avail,
+        kpi_failures,
+        fig_sector,
+        fig_donut,
+        table_component,
+    )
+
+
+@app.callback(
+    Output("download-downtime-report", "data"),
+    [
+        Input("btn-export-downtime-csv", "n_clicks"),
+        Input("btn-export-downtime-excel", "n_clicks"),
+    ],
+    Input("downtime-shift-filter", "value"),
+    prevent_initial_call=True,
+)
+def export_downtime_report(n_clicks_csv, n_clicks_excel, selected_shift):
+    button_id = ctx.triggered_id
+    if not button_id:
+        return None
+
+    shift_arg = None if selected_shift == "ALL" else selected_shift
+    df_events = downtime_engine.get_detailed_downtime_log(shift_arg)
+    df_sector = downtime_engine.get_pareto_by_sector(shift_arg)
+    tpm_kpis = downtime_engine.calculate_tpm_kpis(shift_arg)
+
+    if button_id == "btn-export-downtime-csv":
+        csv_bytes = io.BytesIO()
+        df_events.write_csv(csv_bytes)
+        return dcc.send_bytes(csv_bytes.getvalue(), "relatorio_downtime_paradas.csv")
+
+    elif button_id == "btn-export-downtime-excel":
+        df_tpm = pl.DataFrame([
+            {"Metrica": "MTBF (minutos)", "Valor": f"{tpm_kpis.mtbf_minutes:.1f}"},
+            {"Metrica": "MTTR (minutos)", "Valor": f"{tpm_kpis.mttr_minutes:.1f}"},
+            {"Metrica": "Disponibilidade Tecnica", "Valor": f"{tpm_kpis.technical_availability*100:.2f}%"},
+            {"Metrica": "Contagem de Falhas Nao-Planejadas", "Valor": str(tpm_kpis.failures_count)},
+            {"Metrica": "Total Minutos Parados", "Valor": f"{tpm_kpis.total_downtime_minutes:.1f}"},
+        ])
+
+        excel_bytes = io.BytesIO()
+        with pl.Config(tbl_rows=-1):
+            df_tpm.write_excel(
+                workbook=excel_bytes,
+                worksheet="Resumo_TPM",
+                table_style="Table Style Medium 9",
+            )
+            df_sector.write_excel(
+                workbook=excel_bytes,
+                worksheet="Pareto_Setores",
+                table_style="Table Style Medium 2",
+            )
+            df_events.write_excel(
+                workbook=excel_bytes,
+                worksheet="Historico_Paradas",
+                table_style="Table Style Medium 4",
+            )
+        return dcc.send_bytes(excel_bytes.getvalue(), "relatorio_auditoria_downtime.xlsx")
+
+
+# ========================================================
+# CALLBACKS DA ABA DE CEP
+# ========================================================
 @app.callback(
     [
         Output("kpi-cp", "children"),
@@ -306,7 +467,6 @@ def update_spc_tab(active_tab):
     )
 
 
-# Callback de Exportação da Aba de CEP (CSV / Excel direto pelo Polars)
 @app.callback(
     Output("download-spc-report", "data"),
     [

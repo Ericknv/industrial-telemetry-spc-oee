@@ -1,13 +1,13 @@
 """
 Layout da Aba de OEE:
-Visual refinado em alto contraste, cards industriais, linha do tempo Gantt,
-gráficos de perdas, simulador interativo What-If e botões de exportação de dados.
+Estrutura Panorâmica Horizontal (12 colunas) em alto contraste,
+com dropdown de turno blindado contra transparência.
 """
 
 from dash import dcc, html
 import dash_bootstrap_components as dbc
 
-STYLE_MARK_DIM = {"color": "#94a3b8", "fontSize": "0.85rem", "fontWeight": "500"}
+STYLE_MARK_DIM = {"color": "#94a3b8", "fontSize": "0.82rem", "fontWeight": "500"}
 SLIDER_MARKS = {
     0: {"label": "0%", "style": STYLE_MARK_DIM},
     25: {"label": "-25%", "style": STYLE_MARK_DIM},
@@ -16,18 +16,11 @@ SLIDER_MARKS = {
     100: {"label": "-100%", "style": STYLE_MARK_DIM},
 }
 
-DROPDOWN_STYLE = {
-    "backgroundColor": "#1e293b",
-    "color": "#0f172a",
-    "border": "1px solid #475569",
-    "borderRadius": "6px",
-}
-
 
 def render_tab_oee() -> html.Div:
     return html.Div(
         [
-            # Seletor de turno operacional e Botões de Exportação
+            # Barra Superior: Seletor de Turno + Botões de Exportação
             dbc.Row(
                 [
                     dbc.Col(
@@ -35,7 +28,6 @@ def render_tab_oee() -> html.Div:
                             html.Label(
                                 "SELEÇÃO DE TURNO OPERACIONAL",
                                 className="kpi-title mb-2 d-block",
-                                style={"color": "#94a3b8", "fontWeight": "600"},
                             ),
                             html.Div(
                                 dcc.Dropdown(
@@ -48,21 +40,23 @@ def render_tab_oee() -> html.Div:
                                     ],
                                     value="ALL",
                                     clearable=False,
-                                    style=DROPDOWN_STYLE,
+                                    style={
+                                        "backgroundColor": "#1e293b",
+                                        "color": "#38bdf8",
+                                    },
                                 ),
-                                style={"color": "#0f172a"},
+                                style={"backgroundColor": "#1e293b", "borderRadius": "6px"},
                             ),
                         ],
                         width=12,
-                        md=5,
+                        md=4,
                         className="mb-4",
                     ),
                     dbc.Col(
                         [
                             html.Label(
-                                "EXPORTAÇÃO DE RELATÓRIO OPERACIONAL",
+                                "EXPORTAÇÃO DE RELATÓRIOS",
                                 className="kpi-title mb-2 d-block",
-                                style={"color": "#94a3b8", "fontWeight": "600"},
                             ),
                             dbc.ButtonGroup(
                                 [
@@ -70,23 +64,22 @@ def render_tab_oee() -> html.Div:
                                         "Exportar CSV",
                                         id="btn-export-oee-csv",
                                         color="secondary",
-                                        className="fw-bold px-3",
                                         outline=True,
+                                        className="fw-bold px-3",
                                     ),
                                     dbc.Button(
                                         "Exportar Excel (.xlsx)",
                                         id="btn-export-oee-excel",
                                         color="success",
-                                        className="fw-bold px-3 ms-2",
                                         outline=True,
+                                        className="fw-bold px-3 ms-2",
                                     ),
                                 ]
                             ),
-                            # Componente invisível de Download
                             dcc.Download(id="download-oee-report"),
                         ],
                         width=12,
-                        md=7,
+                        md=8,
                         className="mb-4 d-flex flex-column align-items-md-end justify-content-end",
                     ),
                 ]
@@ -109,7 +102,7 @@ def render_tab_oee() -> html.Div:
                         html.Div(
                             [
                                 html.Span("DISPONIBILIDADE (A)", className="kpi-title"),
-                                html.Div(id="kpi-availability", className="kpi-value", style={"color": "#f8fafc"}),
+                                html.Div(id="kpi-availability", className="kpi-value"),
                             ],
                             className="kpi-card p-3 mb-3",
                         ),
@@ -120,7 +113,7 @@ def render_tab_oee() -> html.Div:
                         html.Div(
                             [
                                 html.Span("PERFORMANCE (P)", className="kpi-title"),
-                                html.Div(id="kpi-performance", className="kpi-value", style={"color": "#f8fafc"}),
+                                html.Div(id="kpi-performance", className="kpi-value"),
                             ],
                             className="kpi-card p-3 mb-3",
                         ),
@@ -131,7 +124,7 @@ def render_tab_oee() -> html.Div:
                         html.Div(
                             [
                                 html.Span("QUALIDADE (Q)", className="kpi-title"),
-                                html.Div(id="kpi-quality", className="kpi-value", style={"color": "#f8fafc"}),
+                                html.Div(id="kpi-quality", className="kpi-value"),
                             ],
                             className="kpi-card p-3 mb-3",
                         ),
@@ -140,7 +133,7 @@ def render_tab_oee() -> html.Div:
                     ),
                 ]
             ),
-            # Linha do Tempo Operacional (Gantt)
+            # Linha do Tempo Operacional (Gantt em Largura Total)
             dbc.Row(
                 [
                     dbc.Col(
@@ -152,7 +145,7 @@ def render_tab_oee() -> html.Div:
                     )
                 ]
             ),
-            # Gráficos em contêineres Slate (Cascata e Pareto)
+            # Gráficos em Duas Colunas (Cascata e Pareto)
             dbc.Row(
                 [
                     dbc.Col(
@@ -173,34 +166,27 @@ def render_tab_oee() -> html.Div:
                     ),
                 ]
             ),
-            # SEÇÃO: Simulador What-If de Engenharia
+            # Simulador de Sensibilidade What-If
             html.Div(
                 [
                     html.H4(
                         "Simulador de Sensibilidade e Melhoria Contínua (What-If)",
-                        style={"color": "#f8fafc", "fontWeight": "700", "marginTop": "15px", "marginBottom": "5px"},
+                        style={"color": "#f8fafc", "fontWeight": "700", "marginTop": "10px", "marginBottom": "5px"},
                     ),
                     html.P(
                         "Projete ganhos de produção e OEE simulando a eliminação de causas-raiz em Kaizen e SMED.",
-                        style={"color": "#94a3b8", "marginBottom": "25px", "fontSize": "0.95rem"},
+                        style={"color": "#94a3b8", "marginBottom": "20px", "fontSize": "0.92rem"},
                     ),
                     dbc.Row(
                         [
+                            # Controles Deslizantes
                             dbc.Col(
                                 html.Div(
                                     [
                                         html.Div(
                                             [
-                                                html.Span(
-                                                    "REDUÇÃO DE SETUP (SMED):",
-                                                    className="kpi-title",
-                                                    style={"color": "#cbd5e1"},
-                                                ),
-                                                html.Span(
-                                                    id="badge-setup-value",
-                                                    className="badge bg-primary ms-2 px-2 py-1",
-                                                    style={"fontSize": "0.9rem", "fontWeight": "bold"},
-                                                ),
+                                                html.Span("REDUÇÃO SETUP (SMED):", className="kpi-title"),
+                                                html.Span(id="badge-setup-value", className="ms-2 px-2 py-1 badge bg-primary fw-bold"),
                                             ],
                                             className="d-flex align-items-center mb-2",
                                         ),
@@ -216,16 +202,8 @@ def render_tab_oee() -> html.Div:
                                         html.Br(),
                                         html.Div(
                                             [
-                                                html.Span(
-                                                    "REDUÇÃO DE FALHAS MECÂNICAS (TPM):",
-                                                    className="kpi-title",
-                                                    style={"color": "#cbd5e1"},
-                                                ),
-                                                html.Span(
-                                                    id="badge-breakdown-value",
-                                                    className="badge bg-danger ms-2 px-2 py-1",
-                                                    style={"fontSize": "0.9rem", "fontWeight": "bold"},
-                                                ),
+                                                html.Span("REDUÇÃO FALHAS MECÂNICAS (TPM):", className="kpi-title"),
+                                                html.Span(id="badge-breakdown-value", className="ms-2 px-2 py-1 badge bg-danger fw-bold"),
                                             ],
                                             className="d-flex align-items-center mb-2",
                                         ),
@@ -241,16 +219,8 @@ def render_tab_oee() -> html.Div:
                                         html.Br(),
                                         html.Div(
                                             [
-                                                html.Span(
-                                                    "REDUÇÃO DE REFUGOS (POKA-YOKE):",
-                                                    className="kpi-title",
-                                                    style={"color": "#cbd5e1"},
-                                                ),
-                                                html.Span(
-                                                    id="badge-scrap-value",
-                                                    className="badge bg-warning text-dark ms-2 px-2 py-1",
-                                                    style={"fontSize": "0.9rem", "fontWeight": "bold"},
-                                                ),
+                                                html.Span("REDUÇÃO REFUGOS (POKA-YOKE):", className="kpi-title"),
+                                                html.Span(id="badge-scrap-value", className="ms-2 px-2 py-1 badge bg-warning text-dark fw-bold"),
                                             ],
                                             className="d-flex align-items-center mb-2",
                                         ),
@@ -269,14 +239,11 @@ def render_tab_oee() -> html.Div:
                                 width=12,
                                 lg=7,
                             ),
+                            # Resultados Projetados
                             dbc.Col(
                                 html.Div(
                                     [
-                                        html.Span(
-                                            "PROJEÇÃO DE GANHO OPERACIONAL",
-                                            className="kpi-title mb-4 d-block",
-                                            style={"color": "#cbd5e1"},
-                                        ),
+                                        html.Span("PROJEÇÃO DE GANHO OPERACIONAL", className="kpi-title mb-4 d-block"),
                                         dbc.Row(
                                             [
                                                 dbc.Col(

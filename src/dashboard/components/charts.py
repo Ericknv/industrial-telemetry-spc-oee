@@ -1,6 +1,7 @@
 """
 Módulo de Visualização Gráfica (Plotly):
-Gera figuras interativas com design industrial escuro para OEE e CEP.
+Gera figuras analíticas interativas de OEE, Confiabilidade (Downtime/TPM)
+e Controle Estatístico de Processo (CEP) no Design System Slate de Alto Contraste.
 """
 
 from typing import Dict, List
@@ -12,15 +13,16 @@ import polars as pl
 from src.core.oee_engine import OEEMetrics
 from src.core.spc_engine import SPCLimits
 
-# Paleta Industrial Slate Harmonizada
-DARK_BG = "#0f172a"      # Fundo do gráfico igual ao fundo principal
-PAPER_BG = "#1e293b"     # Fundo do cartão
-TEXT_COLOR = "#f8fafc"   # Texto claro e legível
-GRID_COLOR = "#334155"   # Linhas de grade suaves
-ACCENT_BLUE = "#38bdf8"
-ALERT_RED = "#f43f5e"
-SUCCESS_GREEN = "#10b981"
-WARNING_AMBER = "#f59e0b"
+# Paleta Industrial Slate Unificada
+DARK_BG = "#0f172a"        # Fundo interno da plotagem
+PAPER_BG = "#1e293b"       # Fundo dos cartões e contêineres
+TEXT_COLOR = "#f8fafc"     # Texto principal nítido
+MUTED_TEXT = "#94a3b8"     # Legendas e rótulos secundários
+GRID_COLOR = "#334155"     # Linhas de grade sutis
+ACCENT_CYAN = "#38bdf8"    # Ciano de telemetria
+SUCCESS_GREEN = "#10b981"  # Verde operacional
+WARNING_AMBER = "#f59e0b"  # Amarelo de atenção
+ALERT_RED = "#ef4444"      # Vermelho de paradas e falhas
 
 
 def create_oee_waterfall(metrics: OEEMetrics) -> go.Figure:
@@ -59,16 +61,19 @@ def create_oee_waterfall(metrics: OEEMetrics) -> go.Figure:
             ],
             decreasing={"marker": {"color": ALERT_RED}},
             increasing={"marker": {"color": SUCCESS_GREEN}},
-            totals={"marker": {"color": ACCENT_BLUE}},
+            totals={"marker": {"color": ACCENT_CYAN}},
         )
     )
 
     fig.update_layout(
-        title="<b>Decomposição de Perdas Operacionais (Tempo)</b>",
+        title=dict(
+            text="<b>DECOMPOSIÇÃO DE PERDAS OPERACIONAIS (TEMPO)</b>",
+            font=dict(size=13, color=TEXT_COLOR),
+        ),
         paper_bgcolor=PAPER_BG,
         plot_bgcolor=DARK_BG,
-        font=dict(color=TEXT_COLOR, family="Arial"),
-        margin=dict(l=40, r=40, t=60, b=40),
+        font=dict(color=TEXT_COLOR, family="Segoe UI, sans-serif"),
+        margin=dict(l=40, r=40, t=55, b=40),
         yaxis=dict(title="Minutos", gridcolor=GRID_COLOR),
         xaxis=dict(gridcolor=GRID_COLOR),
     )
@@ -91,7 +96,7 @@ def create_pareto_chart(df_pareto: pl.DataFrame) -> go.Figure:
             x=reasons,
             y=durations,
             name="Tempo Parado (min)",
-            marker_color=ACCENT_BLUE,
+            marker_color=ACCENT_CYAN,
         ),
         secondary_y=False,
     )
@@ -102,18 +107,21 @@ def create_pareto_chart(df_pareto: pl.DataFrame) -> go.Figure:
             y=cum_pct,
             name="% Acumulado",
             mode="lines+markers",
-            line=dict(color=WARNING_AMBER, width=2),
-            marker=dict(size=6),
+            line=dict(color=WARNING_AMBER, width=2.5),
+            marker=dict(size=7),
         ),
         secondary_y=True,
     )
 
     fig.update_layout(
-        title="<b>Diagrama de Pareto: Causas de Parada de Linha</b>",
+        title=dict(
+            text="<b>DIAGRAMA DE PARETO: CAUSAS DE PARADA DE LINHA</b>",
+            font=dict(size=13, color=TEXT_COLOR),
+        ),
         paper_bgcolor=PAPER_BG,
         plot_bgcolor=DARK_BG,
-        font=dict(color=TEXT_COLOR, family="Arial"),
-        margin=dict(l=40, r=40, t=60, b=40),
+        font=dict(color=TEXT_COLOR, family="Segoe UI, sans-serif"),
+        margin=dict(l=40, r=40, t=55, b=40),
         legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
         xaxis=dict(gridcolor=GRID_COLOR),
     )
@@ -128,6 +136,227 @@ def create_pareto_chart(df_pareto: pl.DataFrame) -> go.Figure:
     return fig
 
 
+def create_oee_timeline_gantt(df_timeline: pl.DataFrame) -> go.Figure:
+    """Linha do tempo contínua em raias operacionais (Swimlanes)."""
+    if df_timeline.is_empty():
+        return go.Figure()
+
+    color_map = {
+        "PRODUÇÃO REGULAR (RUN)": SUCCESS_GREEN,
+        "SETUP_AJUSTE": WARNING_AMBER,
+        "FALHA_MECANICA": ALERT_RED,
+        "FALTA_MATERIAL": "#c084fc",
+        "MICROPARADA_SENSOR": ACCENT_CYAN,
+        "INSPECAO_QUALIDADE": "#38bdf8",
+    }
+
+    standard_categories = [
+        "INSPECAO_QUALIDADE",
+        "MICROPARADA_SENSOR",
+        "FALHA_MECANICA",
+        "FALTA_MATERIAL",
+        "SETUP_AJUSTE",
+        "PRODUÇÃO REGULAR (RUN)",
+    ]
+
+    fig = go.Figure()
+
+    for cat in standard_categories:
+        sub_df = df_timeline.filter(pl.col("category") == cat)
+        color = color_map.get(cat, MUTED_TEXT)
+
+        if sub_df.is_empty():
+            fig.add_trace(
+                go.Bar(
+                    base=[df_timeline["start_time"][0]],
+                    x=[0],
+                    y=[cat],
+                    orientation="h",
+                    marker=dict(color="rgba(0,0,0,0)"),
+                    showlegend=False,
+                    hoverinfo="skip",
+                )
+            )
+            continue
+
+        starts = sub_df["start_time"].to_list()
+        ends = sub_df["end_time"].to_list()
+        mins = sub_df["duration_min"].to_list()
+        durs_sec = sub_df["duration_sec"].to_list()
+
+        for i in range(len(starts)):
+            dur_visual_sec = max(durs_sec[i], 180.0) if cat != "PRODUÇÃO REGULAR (RUN)" else durs_sec[i]
+            dur_ms = dur_visual_sec * 1000.0
+            st = starts[i]
+            et = ends[i]
+
+            fig.add_trace(
+                go.Bar(
+                    base=st,
+                    x=[dur_ms],
+                    y=[cat],
+                    orientation="h",
+                    marker=dict(
+                        color=color,
+                        line=dict(color="#f8fafc" if cat != "PRODUÇÃO REGULAR (RUN)" else "#0f172a", width=0.8),
+                    ),
+                    name=cat,
+                    showlegend=(i == 0),
+                    legendgroup=cat,
+                    hovertemplate=(
+                        f"<b>{cat}</b><br>"
+                        + f"Início: {st.strftime('%H:%M:%S')}<br>"
+                        + f"Fim: {et.strftime('%H:%M:%S')}<br>"
+                        + f"Duração Real: <b>{mins[i]:.1f} min</b><extra></extra>"
+                    ),
+                )
+            )
+
+    fig.update_layout(
+        title=dict(
+            text="<b>LINHA DO TEMPO DE OPERAÇÃO FABRIL (SWIMLANES)</b>",
+            x=0.01,
+            y=0.98,
+            font=dict(size=13, color=TEXT_COLOR),
+        ),
+        paper_bgcolor=PAPER_BG,
+        plot_bgcolor=DARK_BG,
+        font=dict(color=TEXT_COLOR, family="Segoe UI, sans-serif"),
+        margin=dict(l=200, r=40, t=75, b=45),
+        barmode="overlay",
+        bargap=0.35,
+        height=380,
+        xaxis=dict(
+            title="Horário de Produção",
+            type="date",
+            gridcolor=GRID_COLOR,
+            showgrid=True,
+        ),
+        yaxis=dict(
+            gridcolor=GRID_COLOR,
+            tickfont=dict(size=11, color=TEXT_COLOR),
+            categoryorder="array",
+            categoryarray=standard_categories,
+        ),
+        legend=dict(
+            orientation="h",
+            yanchor="bottom",
+            y=1.03,
+            xanchor="left",
+            x=0.01,
+            font=dict(size=10.5),
+        ),
+    )
+    return fig
+
+
+# ========================================================
+# NOVOS COMPONENTES GRÁFICOS: DOWNTIME & CONFIABILIDADE (TPM)
+# ========================================================
+
+def create_sector_pareto_chart(df_sector_pareto: pl.DataFrame) -> go.Figure:
+    """Diagrama de Pareto estratificado por setor fabril responsável pelas paradas."""
+    if df_sector_pareto.is_empty():
+        return go.Figure()
+
+    sectors = df_sector_pareto["sector"].to_list()
+    durations = df_sector_pareto["duration_minutes"].to_list()
+    cum_pct = df_sector_pareto["cumulative_pct"].to_list()
+
+    fig = make_subplots(specs=[[{"secondary_y": True}]])
+
+    fig.add_trace(
+        go.Bar(
+            x=sectors,
+            y=durations,
+            name="Tempo de Parada (min)",
+            marker=dict(
+                color=ALERT_RED,
+                line=dict(color=PAPER_BG, width=1.5),
+            ),
+        ),
+        secondary_y=False,
+    )
+
+    fig.add_trace(
+        go.Scatter(
+            x=sectors,
+            y=cum_pct,
+            name="% Acumulado de Perdas",
+            mode="lines+markers",
+            line=dict(color=WARNING_AMBER, width=2.5),
+            marker=dict(size=8, color=WARNING_AMBER),
+        ),
+        secondary_y=True,
+    )
+
+    fig.update_layout(
+        title=dict(
+            text="<b>ESTRATIFICAÇÃO DE DOWNTIME POR SETOR RESPONSÁVEL</b>",
+            font=dict(size=13, color=TEXT_COLOR),
+        ),
+        paper_bgcolor=PAPER_BG,
+        plot_bgcolor=DARK_BG,
+        font=dict(color=TEXT_COLOR, family="Segoe UI, sans-serif"),
+        margin=dict(l=40, r=40, t=55, b=40),
+        legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
+        xaxis=dict(gridcolor=GRID_COLOR),
+    )
+
+    fig.update_yaxes(title_text="Minutos Parados", gridcolor=GRID_COLOR, secondary_y=False)
+    fig.update_yaxes(
+        title_text="% Acumulado",
+        range=[0, 105],
+        gridcolor=GRID_COLOR,
+        secondary_y=True,
+    )
+    return fig
+
+
+def create_stop_type_donut(df_stop_types: pl.DataFrame) -> go.Figure:
+    """Gráfico de rosca (Donut) categorizando Paradas Planejadas vs. Não-Planejadas."""
+    if df_stop_types.is_empty():
+        return go.Figure()
+
+    types = df_stop_types["stop_type"].to_list()
+    minutes = df_stop_types["total_minutes"].to_list()
+
+    colors = [
+        WARNING_AMBER if t == "PLANEJADA" else ALERT_RED
+        for t in types
+    ]
+
+    fig = go.Figure(
+        data=[
+            go.Pie(
+                labels=types,
+                values=minutes,
+                hole=0.6,
+                marker=dict(colors=colors, line=dict(color=PAPER_BG, width=2)),
+                textinfo="label+percent",
+                hovertemplate="<b>%{label}</b><br>Tempo: %{value:.1f} min<br>Proporção: %{percent}<extra></extra>",
+            )
+        ]
+    )
+
+    fig.update_layout(
+        title=dict(
+            text="<b>CLASSIFICAÇÃO DE PARADAS (TPM)</b>",
+            font=dict(size=13, color=TEXT_COLOR),
+        ),
+        paper_bgcolor=PAPER_BG,
+        plot_bgcolor=DARK_BG,
+        font=dict(color=TEXT_COLOR, family="Segoe UI, sans-serif"),
+        margin=dict(l=30, r=30, t=55, b=30),
+        legend=dict(orientation="h", yanchor="bottom", y=-0.1, xanchor="center", x=0.5),
+    )
+    return fig
+
+
+# ========================================================
+# COMPONENTES GRÁFICOS: ENGENHARIA DA QUALIDADE (CEP)
+# ========================================================
+
 def create_xbar_chart(
     df_subgroups: pl.DataFrame, limits: SPCLimits, violations: Dict[int, List[int]]
 ) -> go.Figure:
@@ -140,7 +369,7 @@ def create_xbar_chart(
         anomalous_indices.update(idxs)
 
     point_colors = [
-        ALERT_RED if i in anomalous_indices else ACCENT_BLUE
+        ALERT_RED if i in anomalous_indices else ACCENT_CYAN
         for i in range(len(subgroups))
     ]
 
@@ -152,7 +381,7 @@ def create_xbar_chart(
             y=means,
             mode="lines+markers",
             name="Média Amostral (X̄)",
-            line=dict(color="#94a3b8", width=1.5),
+            line=dict(color=MUTED_TEXT, width=1.5),
             marker=dict(color=point_colors, size=8),
         )
     )
@@ -166,7 +395,7 @@ def create_xbar_chart(
     fig.add_hline(
         y=limits.x_cl,
         line_color=SUCCESS_GREEN,
-        annotation_text=f"CL (X̄̄): {limits.x_cl}",
+        annotation_text=f"CL (X̿): {limits.x_cl}",
     )
     fig.add_hline(
         y=limits.x_lcl,
@@ -176,11 +405,14 @@ def create_xbar_chart(
     )
 
     fig.update_layout(
-        title="<b>Carta de Controle de Médias (X̄)</b>",
+        title=dict(
+            text="<b>CARTA DE CONTROLE DE MÉDIAS (X̄)</b>",
+            font=dict(size=13, color=TEXT_COLOR),
+        ),
         paper_bgcolor=PAPER_BG,
         plot_bgcolor=DARK_BG,
-        font=dict(color=TEXT_COLOR, family="Arial"),
-        margin=dict(l=40, r=40, t=60, b=40),
+        font=dict(color=TEXT_COLOR, family="Segoe UI, sans-serif"),
+        margin=dict(l=40, r=40, t=55, b=40),
         xaxis=dict(title="Subgrupo Racional (k)", gridcolor=GRID_COLOR),
         yaxis=dict(title="Dimensão (mm)", gridcolor=GRID_COLOR),
     )
@@ -200,7 +432,7 @@ def create_r_chart(df_subgroups: pl.DataFrame, limits: SPCLimits) -> go.Figure:
             y=ranges,
             mode="lines+markers",
             name="Amplitude (R)",
-            line=dict(color=ACCENT_BLUE, width=1.5),
+            line=dict(color=ACCENT_CYAN, width=1.5),
             marker=dict(size=7),
         )
     )
@@ -219,11 +451,14 @@ def create_r_chart(df_subgroups: pl.DataFrame, limits: SPCLimits) -> go.Figure:
     fig.add_hline(y=limits.r_lcl, line_dash="dash", line_color=ALERT_RED)
 
     fig.update_layout(
-        title="<b>Carta de Controle de Amplitude (R)</b>",
+        title=dict(
+            text="<b>CARTA DE CONTROLE DE AMPLITUDE (R)</b>",
+            font=dict(size=13, color=TEXT_COLOR),
+        ),
         paper_bgcolor=PAPER_BG,
         plot_bgcolor=DARK_BG,
-        font=dict(color=TEXT_COLOR, family="Arial"),
-        margin=dict(l=40, r=40, t=60, b=40),
+        font=dict(color=TEXT_COLOR, family="Segoe UI, sans-serif"),
+        margin=dict(l=40, r=40, t=55, b=40),
         xaxis=dict(title="Subgrupo Racional (k)", gridcolor=GRID_COLOR),
         yaxis=dict(title="Amplitude (mm)", gridcolor=GRID_COLOR),
     )
@@ -233,10 +468,7 @@ def create_r_chart(df_subgroups: pl.DataFrame, limits: SPCLimits) -> go.Figure:
 def create_capability_histogram(
     df_raw_samples: pl.DataFrame, limits: SPCLimits
 ) -> go.Figure:
-    """
-    Histograma de distribuição com curva normal teórica ajustada e
-    linhas de limites de especificação de engenharia (LSL e USL).
-    """
+    """Histograma com curva normal ajustada e limites LSL/USL."""
     if df_raw_samples.is_empty():
         return go.Figure()
 
@@ -256,7 +488,7 @@ def create_capability_histogram(
             histnorm="probability density",
             name="Medições Reais",
             marker=dict(
-                color=ACCENT_BLUE,
+                color=ACCENT_CYAN,
                 opacity=0.65,
                 line=dict(color=TEXT_COLOR, width=0.5),
             ),
@@ -306,131 +538,16 @@ def create_capability_histogram(
     )
 
     fig.update_layout(
-        title=f"<b>Distribuição Dimensional e Capacidade de Processo (Cp: {limits.cp:.2f} | Cpk: {limits.cpk:.2f})</b>",
+        title=dict(
+            text=f"<b>DISTRIBUIÇÃO DIMENSIONAL E CAPACIDADE (Cp: {limits.cp:.2f} | Cpk: {limits.cpk:.2f})</b>",
+            font=dict(size=13, color=TEXT_COLOR),
+        ),
         paper_bgcolor=PAPER_BG,
         plot_bgcolor=DARK_BG,
-        font=dict(color=TEXT_COLOR, family="Arial"),
-        margin=dict(l=40, r=40, t=60, b=40),
+        font=dict(color=TEXT_COLOR, family="Segoe UI, sans-serif"),
+        margin=dict(l=40, r=40, t=55, b=40),
         xaxis=dict(title="Dimensão Medida (mm)", gridcolor=GRID_COLOR),
         yaxis=dict(title="Densidade de Probabilidade", gridcolor=GRID_COLOR),
         legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
-    )
-    return fig
-
-
-def create_oee_timeline_gantt(df_timeline: pl.DataFrame) -> go.Figure:
-    """
-    Gantt estruturado por raias operacionais (Swimlanes),
-    com altura generosa, blocos destacados e legenda espaçada.
-    """
-    if df_timeline.is_empty():
-        return go.Figure()
-
-    color_map = {
-        "PRODUÇÃO REGULAR (RUN)": SUCCESS_GREEN,
-        "SETUP_AJUSTE": WARNING_AMBER,
-        "FALHA_MECANICA": ALERT_RED,
-        "FALTA_MATERIAL": "#a855f7",
-        "MICROPARADA_SENSOR": ACCENT_BLUE,
-    }
-
-    # Ordem fixa e padronizada das raias para garantir visual limpo
-    standard_categories = [
-        "MICROPARADA_SENSOR",
-        "FALHA_MECANICA",
-        "FALTA_MATERIAL",
-        "SETUP_AJUSTE",
-        "PRODUÇÃO REGULAR (RUN)",
-    ]
-
-    fig = go.Figure()
-
-    for cat in standard_categories:
-        sub_df = df_timeline.filter(pl.col("category") == cat)
-        color = color_map.get(cat, "#94a3b8")
-
-        if sub_df.is_empty():
-            # Linha vazia de ancoragem para manter a raia visível
-            fig.add_trace(
-                go.Bar(
-                    base=[df_timeline["start_time"][0]],
-                    x=[0],
-                    y=[cat],
-                    orientation="h",
-                    marker=dict(color="rgba(0,0,0,0)"),
-                    showlegend=False,
-                    hoverinfo="skip",
-                )
-            )
-            continue
-
-        starts = sub_df["start_time"].to_list()
-        ends = sub_df["end_time"].to_list()
-        mins = sub_df["duration_min"].to_list()
-        durs_sec = sub_df["duration_sec"].to_list()
-
-        for i in range(len(starts)):
-            # Garante visibilidade mínima de pelo menos 180 segundos no traço visual
-            dur_visual_sec = max(durs_sec[i], 180.0) if cat != "PRODUÇÃO REGULAR (RUN)" else durs_sec[i]
-            dur_ms = dur_visual_sec * 1000.0
-            st = starts[i]
-            et = ends[i]
-
-            fig.add_trace(
-                go.Bar(
-                    base=st,
-                    x=[dur_ms],
-                    y=[cat],
-                    orientation="h",
-                    marker=dict(
-                        color=color,
-                        line=dict(color="#f8fafc" if cat != "PRODUÇÃO REGULAR (RUN)" else "#0f172a", width=0.8),
-                    ),
-                    name=cat,
-                    showlegend=(i == 0),
-                    legendgroup=cat,
-                    hovertemplate=(
-                        f"<b>{cat}</b><br>"
-                        + f"Início: {st.strftime('%H:%M:%S')}<br>"
-                        + f"Fim: {et.strftime('%H:%M:%S')}<br>"
-                        + f"Duração Real: <b>{mins[i]:.1f} min</b><extra></extra>"
-                    ),
-                )
-            )
-
-    fig.update_layout(
-        title=dict(
-            text="<b>Linha do Tempo de Operação Fabril (Swimlanes Operacionais)</b>",
-            x=0.01,
-            y=0.98,
-            font=dict(size=15, color=TEXT_COLOR),
-        ),
-        paper_bgcolor=PAPER_BG,
-        plot_bgcolor=DARK_BG,
-        font=dict(color=TEXT_COLOR, family="Arial"),
-        margin=dict(l=200, r=40, t=75, b=45),
-        barmode="overlay",
-        bargap=0.35,
-        height=380,
-        xaxis=dict(
-            title="Horário de Produção",
-            type="date",
-            gridcolor=GRID_COLOR,
-            showgrid=True,
-        ),
-        yaxis=dict(
-            gridcolor=GRID_COLOR,
-            tickfont=dict(size=11, color=TEXT_COLOR),
-            categoryorder="array",
-            categoryarray=standard_categories,
-        ),
-        legend=dict(
-            orientation="h",
-            yanchor="bottom",
-            y=1.03,
-            xanchor="left",
-            x=0.01,
-            font=dict(size=10.5),
-        ),
     )
     return fig
